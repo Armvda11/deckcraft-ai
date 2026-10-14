@@ -74,12 +74,12 @@ fn main() -> ExitCode {
         Some("mcp") => report(mcp(rest)),
         Some("links") => {
             use deckcraft_engine::links::*;
-            outln!("Discord   {DISCORD}\nWebsite   {WEBSITE}\nApp page  {APP_PAGE}\nGitHub    {GITHUB}");
+            outln!("Upstream GitHub   {GITHUB}\nUpstream issues   {ISSUES}");
             ExitCode::SUCCESS
         }
         _ => {
             eprintln!("{USAGE}");
-            eprintln!("\nCommunity: {}  ·  {}", deckcraft_engine::links::DISCORD, deckcraft_engine::links::APP_PAGE);
+            eprintln!("\nUpstream project: {}", deckcraft_engine::links::GITHUB);
             ExitCode::FAILURE
         }
     }

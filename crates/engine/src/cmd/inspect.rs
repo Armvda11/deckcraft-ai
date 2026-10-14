@@ -31,6 +31,8 @@ fn document(s: &mut Session, _p: &Value) -> Result<Value> {
     let m = d.masters.first();
     Ok(json!({
         "title": st.title(),
+        "documentUid": st.uid,
+        "contentRevision": st.content_revision,
         "path": st.path,
         "dirty": st.is_dirty(),
         "slideSize": [d.slide_size.width, d.slide_size.height],
@@ -41,6 +43,7 @@ fn document(s: &mut Session, _p: &Value) -> Result<Value> {
         "layouts": m.map(|m| m.layouts.iter().map(|l| json!({"id": l.id, "name": l.name})).collect::<Vec<_>>()),
         "selection": serde_json::to_value(&st.selection).unwrap_or_default(),
         "media": d.media.iter().map(|x| json!({"id": x.id, "name": x.name, "type": x.content_type, "bytes": x.data.len()})).collect::<Vec<_>>(),
+        "sources": d.sources,
         "undo": st.history.undo.last().map(|e| e.label.clone()),
         "redo": st.history.redo.last().map(|e| e.label.clone()),
     }))
@@ -62,6 +65,8 @@ pub fn shape_summary(ctx: Option<&Ctx>, sh: &Shape, depth: usize) -> Value {
         "kind": sh.kind_name(),
         "box": [round(x.x), round(x.y), round(x.w), round(x.h)],
         "rotation": x.rot,
+        "sourceRefs": sh.source_refs,
+        "equationSource": sh.equation_source,
     });
     if let Some(o) = v.as_object_mut() {
         if let Some(p) = &sh.ph {

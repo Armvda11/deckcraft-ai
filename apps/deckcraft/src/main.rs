@@ -41,14 +41,14 @@ impl eframe::App for App {
 /// The per-user settings directory: `ui.json`, `prefs.json` and `logs/` live here.
 fn config_dir() -> Option<std::path::PathBuf> {
     if cfg!(target_os = "macos") {
-        std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join("Library/Application Support/DeckCraft"))
+        std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join("Library/Application Support/DeckCraftAI"))
     } else if cfg!(windows) {
-        std::env::var_os("APPDATA").map(|a| std::path::PathBuf::from(a).join("DeckCraft"))
+        std::env::var_os("APPDATA").map(|a| std::path::PathBuf::from(a).join("DeckCraftAI"))
     } else {
         std::env::var_os("XDG_CONFIG_HOME")
             .map(std::path::PathBuf::from)
             .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))
-            .map(|c| c.join("deckcraft"))
+            .map(|c| c.join("deckcraft-ai"))
     }
 }
 
@@ -94,6 +94,7 @@ fn services() -> Services {
         pick_open: Some(Box::new(|purpose: &str| {
             let d = rfd::FileDialog::new();
             let d = match purpose {
+                "ai-source" => d.add_filter("Presentation sources", &["pdf", "docx", "md", "txt", "csv", "png", "jpg", "jpeg", "webp", "gif"]),
                 "picture" => d.add_filter("Pictures", &["png", "jpg", "jpeg", "gif", "webp", "bmp", "tif", "tiff"]),
                 "audio" => d.add_filter(
                     "Audio",
@@ -127,7 +128,7 @@ fn services() -> Services {
     }
 }
 
-const APP_ID: &str = "ai.storyteller.deckcraft";
+const APP_ID: &str = "org.deckcraftai.editor";
 
 fn app_icon() -> Option<egui::IconData> {
     let png: &[u8] = include_bytes!("../../../assets/app-icon/hicolor/256x256/apps/ai.storyteller.deckcraft.png");
@@ -170,7 +171,7 @@ fn main() -> eframe::Result {
     }
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("DeckCraft")
+            .with_title("DeckCraft AI")
             .with_inner_size([1440.0, 900.0])
             .with_min_inner_size([900.0, 560.0])
             .with_drag_and_drop(true)
@@ -194,7 +195,7 @@ fn main() -> eframe::Result {
     #[cfg(target_os = "windows")]
     graphics::configure(&mut options, eframe::wgpu::Backends::from_env());
     eframe::run_native(
-        "DeckCraft",
+        "DeckCraft AI",
         options,
         Box::new(move |cc| {
             let mut app = SlideApp::new(Session::new(), services());

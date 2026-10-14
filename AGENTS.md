@@ -136,8 +136,11 @@ Standard: craftrules `standards/never-crash.md`.
 ## 5. Quality gates (before every commit)
 
 `cargo xtask ci` = fmt check, clippy `-D warnings`, tests, layering check, asset check, wasm
-check. Commit after each landed arc with a task id in the message (`M1.2: smart guides`) and push
-to `main`.
+check. Commit after each landed arc with a task id in the message (`M1.2: smart guides`). In this
+fork, `origin` is `Armvda11/deckcraft-ai` and `upstream` is `storytold/deckcraft`. Push topic
+branches to `origin` and merge them into the fork's `main` only after review and CI. Never push
+to `upstream`. See
+`CONTRIBUTING.md` for the fork's branch and upstream-update workflow.
 
 ## 6. Running and looking at the app
 

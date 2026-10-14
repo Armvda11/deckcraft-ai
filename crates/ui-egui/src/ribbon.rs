@@ -131,7 +131,7 @@ fn contextual(app: &SlideApp) -> Vec<&'static str> {
     v
 }
 
-const TABS: [&str; 10] = ["Home", "Insert", "Draw", "Design", "Transitions", "Animations", "Slide Show", "Record", "Review", "View"];
+const TABS: [&str; 11] = ["Home", "Insert", "Draw", "Design", "Transitions", "Animations", "Slide Show", "Record", "Review", "View", "AI"];
 
 /// Tab row and the ribbon card.
 pub fn show(app: &mut SlideApp, ui: &mut Ui) {
@@ -205,6 +205,9 @@ pub fn show(app: &mut SlideApp, ui: &mut Ui) {
         let ui = &mut cui;
         let tab = app.ui.tab.clone();
         match tab.as_str() {
+            "AI" => {
+                big(app, ui, Icon::DesignIdeas, "AI\nStudio", "ai.open", json!({}));
+            }
             "Home" => home(app, ui),
             "Insert" => insert(app, ui),
             "Draw" => draw(app, ui),

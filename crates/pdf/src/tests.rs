@@ -66,3 +66,21 @@ fn handout_boxes_fit_the_paper() {
         }
     }
 }
+
+#[test]
+fn click_state_navigation_targets_the_first_state_page() {
+    let pages = vec![
+        vec![(0, Rect::new(0.0, 0.0, 10.0, 10.0), Some(0))],
+        vec![(0, Rect::new(0.0, 0.0, 10.0, 10.0), Some(1))],
+        vec![(1, Rect::new(0.0, 0.0, 10.0, 10.0), Some(0))],
+    ];
+    let lookup = slide_page_lookup(&pages);
+    assert_eq!(lookup.get(&0), Some(&0));
+    assert_eq!(lookup.get(&1), Some(&2));
+}
+
+#[test]
+fn click_state_export_rejects_a_truncated_timeline() {
+    assert!(click_state_range(100, 0).is_ok());
+    assert!(matches!(click_state_range(101, 0), Err(PdfError::ClickStateLimit { slide: 0, .. })));
+}

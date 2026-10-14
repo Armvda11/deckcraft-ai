@@ -145,6 +145,7 @@ pub fn fit_text_box(s: &mut Session, id: ShapeId) -> Result<()> {
         target.xfrm = Some(nx);
     }
     st.doc = Arc::new(d);
+    st.content_revision = st.content_revision.saturating_add(1);
     st.revision += 1;
     Ok(())
 }
@@ -358,6 +359,7 @@ fn autocorrect(s: &mut Session) -> Result<()> {
         ed::insert(b, (t.caret.0, start), &rep, None);
     }
     st.doc = Arc::new(d);
+    st.content_revision = st.content_revision.saturating_add(1);
     let c = (t.caret.0, (end as isize + delta).max(0) as usize);
     if let Some(tt) = st.selection.text.as_mut() {
         tt.caret = c;
@@ -451,6 +453,7 @@ fn compose(s: &mut Session, p: &Value) -> Result<Value> {
         Some(c) if text.is_empty() => {
             let st = s.doc_mut()?;
             st.doc = c.before;
+            st.content_revision = st.content_revision.saturating_add(1);
             st.selection = c.before_selection;
             st.composition = None;
             st.revision += 1;

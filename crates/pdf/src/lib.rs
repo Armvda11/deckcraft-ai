@@ -33,6 +33,8 @@ use serde::{Deserialize, Serialize};
 pub enum PdfError {
     #[error("nothing to export (no slides in range)")]
     NoPages,
+    #[error("slide {slide} has {steps} animation steps; click-state export is limited to 100 steps per slide")]
+    ClickStateLimit { slide: usize, steps: usize },
     #[error("PDF writer: {0}")]
     Write(String),
 }
@@ -61,6 +63,8 @@ pub struct PdfOptions {
     /// Slide indices to export (0-based); `None` = all.
     pub slides: Option<Vec<usize>>,
     pub include_hidden: bool,
+    /// Include the initial slide and each completed click state (raster handout).
+    pub click_states: bool,
     /// Invisible real-text layer (search, select, copy).
     pub text_layer: bool,
     /// Thin frame around each slide (notes/handouts).
@@ -78,6 +82,7 @@ impl Default for PdfOptions {
             dpi: 200.0,
             slides: None,
             include_hidden: false,
+            click_states: false,
             text_layer: true,
             frame_slides: true,
             title: None,
@@ -107,29 +112,39 @@ pub fn export(pres: &Presentation, opts: &PdfOptions) -> Result<Vec<u8>> {
     pdf.set_metadata(meta);
 
     let (sw, sh) = (pres.slide_size.width.max(1.0), pres.slide_size.height.max(1.0));
-    let mut ex = Exporter { pres, opts, fonts: HashMap::new() };
+    let mut ex = Exporter { pres, opts, fonts: HashMap::new(), frame: None };
+    let mut frames = Vec::new();
+    for &i in &slides {
+        if opts.click_states {
+            let steps = deckcraft_anim::Timeline::new(&pres.slides[i], sw, sh).steps();
+            frames.extend(click_state_range(steps, i)?.map(|step| (i, Some(step))));
+        } else {
+            frames.push((i, None));
+        }
+    }
     // Page plan: per page, the slides on it with their boxes (page points).
-    let pages: Vec<Vec<(usize, Rect)>> = match opts.layout {
-        PageLayout::Slides => slides.iter().map(|&i| vec![(i, Rect::new(0.0, 0.0, sw, sh))]).collect(),
+    let pages: Vec<Vec<(usize, Rect, Option<usize>)>> = match opts.layout {
+        PageLayout::Slides => frames.iter().map(|&(i, step)| vec![(i, Rect::new(0.0, 0.0, sw, sh), step)]).collect(),
         PageLayout::Notes => {
             let (pw, _) = opts.paper;
             let w = pw - 2.0 * 72.0;
             let h = w * sh / sw;
-            slides.iter().map(|&i| vec![(i, Rect::new(72.0, 54.0, 72.0 + w, 54.0 + h))]).collect()
+            frames.iter().map(|&(i, step)| vec![(i, Rect::new(72.0, 54.0, 72.0 + w, 54.0 + h), step)]).collect()
         }
         PageLayout::Handouts { per_page } => {
             let boxes = handout_boxes(per_page, opts.paper, sw / sh);
-            slides.chunks(boxes.len()).map(|c| c.iter().zip(&boxes).map(|(i, b)| (*i, *b)).collect()).collect()
+            frames.chunks(boxes.len()).map(|c| c.iter().zip(&boxes).map(|((i, step), b)| (*i, *b, *step)).collect()).collect()
         }
     };
     // Bookmarks and slide → page lookup for internal links.
-    let page_of: HashMap<usize, usize> = pages.iter().enumerate().flat_map(|(p, v)| v.iter().map(move |(i, _)| (*i, p))).collect();
+    let page_of = slide_page_lookup(&pages);
     let mut outline = Outline::new();
     for (p, v) in pages.iter().enumerate() {
-        for (i, _) in v {
+        for (i, _, step) in v {
             let t = pres.slides[*i].title();
             let t = t.lines().next().unwrap_or("").trim().to_string();
             let label = if t.is_empty() { format!("Slide {}", i + 1) } else { format!("{}. {t}", i + 1) };
+            let label = if let Some(step) = step { format!("{label} — state {step}") } else { label };
             outline.push_child(OutlineNode::new(label, XyzDestination::new(p, Point::from_xy(0.0, 0.0))));
         }
     }
@@ -145,13 +160,14 @@ pub fn export(pres: &Presentation, opts: &PdfOptions) -> Result<Vec<u8>> {
         let mut annots = Vec::new();
         {
             let mut s = page.surface();
-            for (i, b) in v {
+            for (i, b, step) in v {
+                ex.frame = *step;
                 ex.slide(&mut s, *i, *b);
                 annots.extend(ex.links(*i, *b, &page_of));
             }
             match opts.layout {
                 PageLayout::Notes => {
-                    if let Some((i, b)) = v.first() {
+                    if let Some((i, b, _)) = v.first() {
                         let notes = pres.slides[*i].notes_text();
                         let area = Rect::new(72.0, b.y1 + 36.0, pw - 72.0, ph - 54.0);
                         ex.paragraphs(&mut s, &notes, area, 12.0);
@@ -160,7 +176,7 @@ pub fn export(pres: &Presentation, opts: &PdfOptions) -> Result<Vec<u8>> {
                 }
                 PageLayout::Handouts { per_page } => {
                     if per_page == 3 {
-                        for (_, b) in v {
+                        for (_, b, _) in v {
                             ex.note_lines(&mut s, Rect::new(b.x1 + 24.0, b.y0, pw - 54.0, b.y1));
                         }
                     }
@@ -176,6 +192,24 @@ pub fn export(pres: &Presentation, opts: &PdfOptions) -> Result<Vec<u8>> {
         page.finish();
     }
     pdf.finish().map_err(|e| PdfError::Write(format!("{e:?}")))
+}
+
+fn click_state_range(steps: usize, slide: usize) -> Result<std::ops::Range<usize>> {
+    let count = steps.checked_add(1).ok_or(PdfError::ClickStateLimit { slide, steps })?;
+    if count > 101 {
+        return Err(PdfError::ClickStateLimit { slide, steps });
+    }
+    Ok(0..count)
+}
+
+fn slide_page_lookup(pages: &[Vec<(usize, Rect, Option<usize>)>]) -> HashMap<usize, usize> {
+    let mut lookup = HashMap::new();
+    for (page, entries) in pages.iter().enumerate() {
+        for (slide, _, _) in entries {
+            lookup.entry(*slide).or_insert(page);
+        }
+    }
+    lookup
 }
 
 /// Slide boxes for a handout page (portrait paper, half-inch-ish margins).
@@ -212,6 +246,7 @@ struct Exporter<'a> {
     pres: &'a Presentation,
     opts: &'a PdfOptions,
     fonts: HashMap<u32, Option<Font>>,
+    frame: Option<usize>,
 }
 
 fn tf(a: Affine) -> Transform {
@@ -239,7 +274,40 @@ impl Exporter<'_> {
         let k = b.width() / sw;
         // Raster at the requested dpi relative to the box size on paper.
         let scale = (b.width() / 72.0 * self.opts.dpi.clamp(36.0, 600.0)) / sw;
-        let img = deckcraft_render::render_slide(pres, i, &RenderOpts { scale, threads: 4, ..Default::default() });
+        let timeline = deckcraft_anim::Timeline::new(&pres.slides[i], sw, sh);
+        let state = |id| {
+            let step = self.frame.unwrap_or(0);
+            let a = timeline.state(id, None, step, 0.0);
+            deckcraft_render::ShapeState {
+                visible: a.visible,
+                opacity: a.opacity,
+                offset: deckcraft_geom::Vec2::new(a.offset_x, a.offset_y),
+                scale: (a.scale_x, a.scale_y),
+                rotate: a.rotate,
+                clip: a.clip,
+                tint: a.tint,
+                paras: timeline
+                    .paragraph_targets(id)
+                    .into_iter()
+                    .map(|p| {
+                        let a = timeline.state(id, Some(p), step, 0.0);
+                        (
+                            p,
+                            deckcraft_render::ParaState {
+                                visible: a.visible,
+                                opacity: a.opacity,
+                                offset: deckcraft_geom::Vec2::new(a.offset_x, a.offset_y),
+                            },
+                        )
+                    })
+                    .collect(),
+            }
+        };
+        let img = deckcraft_render::render_slide(
+            pres,
+            i,
+            &RenderOpts { scale, threads: 4, state: self.frame.map(|_| &state as &dyn Fn(_) -> _), ..Default::default() },
+        );
         if img.width > 0 && img.height > 0 {
             let mut rgba = img.pixels.clone();
             for px in rgba.as_chunks_mut::<4>().0 {
@@ -270,7 +338,7 @@ impl Exporter<'_> {
                 s.set_stroke(None);
             }
         }
-        if self.opts.text_layer {
+        if self.opts.text_layer && self.frame.is_none() {
             let view = Affine::translate((b.x0, b.y0)) * Affine::scale(k);
             for pt in deckcraft_render::place_slide(pres, i).texts {
                 self.text_layer(s, &pt, view);

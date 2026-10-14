@@ -313,6 +313,11 @@ pub struct Shape {
     pub text_box: bool,
     /// Alt text.
     pub descr: String,
+    /// Editable LaTeX source for a rendered equation picture.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub equation_source: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub source_refs: Vec<String>,
     pub title: String,
     pub decorative: bool,
     pub click: Option<text::Hyperlink>,
@@ -340,6 +345,8 @@ impl Default for Shape {
             locked: false,
             text_box: false,
             descr: String::new(),
+            equation_source: None,
+            source_refs: Vec::new(),
             title: String::new(),
             decorative: false,
             click: None,
@@ -843,6 +850,8 @@ pub struct Presentation {
     /// Table styles defined in the file (`ppt/tableStyles.xml`).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub table_styles: Vec<table::TableStyleDef>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<SourceReference>,
     /// Unmodelled presentation-level XML kept for round-trip.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub raw_ext: Option<String>,
@@ -852,6 +861,15 @@ impl Default for Presentation {
     fn default() -> Self {
         defaults::new_presentation(None)
     }
+}
+
+/// A portable citation locator; original documents and credentials are not embedded.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SourceReference {
+    pub id: String,
+    pub name: String,
+    pub locator: String,
 }
 
 impl Presentation {

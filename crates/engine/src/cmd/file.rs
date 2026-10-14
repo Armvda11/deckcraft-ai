@@ -144,6 +144,7 @@ pub fn pdf_options(p: &Value, count: usize) -> Result<deckcraft_pdf::PdfOptions>
         _ => None,
     };
     o.include_hidden = bool_or(p, "includeHidden", false);
+    o.click_states = bool_or(p, "clickStates", false);
     o.text_layer = bool_or(p, "textLayer", true);
     o.frame_slides = bool_or(p, "frame", true);
     Ok(o)
@@ -374,6 +375,7 @@ fn properties(s: &mut Session, p: &Value) -> Result<Value> {
 fn revert(s: &mut Session, _p: &Value) -> Result<Value> {
     let st = s.doc_mut()?;
     st.doc = st.saved_doc.clone();
+    st.content_revision = st.content_revision.saturating_add(1);
     st.history = crate::History { limit: st.history.limit, ..Default::default() };
     st.revision += 1;
     ok()

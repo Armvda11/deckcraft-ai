@@ -35,7 +35,7 @@ pub fn install_panic_hook() {
 impl Session {
     /// Run command `id` (`f`) inside the guard.
     pub(crate) fn guarded(&mut self, id: &str, f: impl FnOnce(&mut Session) -> Result<Value>) -> Result<Value> {
-        let before = self.active().map(|d| (d.uid, d.doc.clone(), d.selection.clone(), d.revision));
+        let before = self.active().map(|d| (d.uid, d.doc.clone(), d.selection.clone(), d.revision, d.content_revision));
         let depth = self.depth;
         match catch_unwind(AssertUnwindSafe(|| f(self))) {
             Ok(r) => r,
@@ -43,10 +43,11 @@ impl Session {
                 self.depth = depth;
                 let msg = panic_message(payload.as_ref());
                 // Keep the document as it was before the command.
-                if let (Some((uid, doc, selection, revision)), Some(st)) = (before, self.active_mut())
+                if let (Some((uid, doc, selection, revision, content_revision)), Some(st)) = (before, self.active_mut())
                     && st.uid == uid
                 {
                     st.doc = doc;
+                    st.content_revision = content_revision;
                     st.selection = selection;
                     st.interaction = None;
                     st.revision = revision.max(st.revision).saturating_add(1);

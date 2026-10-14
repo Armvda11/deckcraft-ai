@@ -30,6 +30,7 @@ fn restore(s: &mut Session, redo: bool) -> Result<Value> {
     let Some(e) = from.pop() else { return ok() };
     to.push(HistoryEntry { label: e.label.clone(), doc: st.doc.clone(), selection: st.selection.clone() });
     st.doc = e.doc;
+    st.content_revision = st.content_revision.saturating_add(1);
     st.selection = e.selection;
     st.interaction = None;
     st.revision += 1;
