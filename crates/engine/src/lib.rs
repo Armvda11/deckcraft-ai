@@ -164,6 +164,8 @@ pub struct DocState {
     pub history: History,
     pub path: Option<String>,
     pub revision: u64,
+    /// Content-only revision: selection and saving do not invalidate AI candidates.
+    pub content_revision: u64,
     pub saved_doc: Arc<Presentation>,
     pub interaction: Option<Interaction>,
     pub uid: u64,
@@ -187,6 +189,7 @@ impl DocState {
             history: History { limit: 500, ..Default::default() },
             path,
             revision: 1,
+            content_revision: 1,
             interaction: None,
             uid: NEXT_UID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             title,
@@ -486,6 +489,7 @@ impl Session {
         let r = f(&mut doc, &mut sel)?;
         connect::reroute(&mut doc, &sel);
         st.doc = Arc::new(doc);
+        st.content_revision = st.content_revision.saturating_add(1);
         st.selection = sel;
         st.revision += 1;
         Ok(r)

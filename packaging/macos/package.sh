@@ -19,10 +19,12 @@ HERE="$ROOT/packaging/macos"
 
 ARCH=universal
 SKIP_BUILD=0
+DEVELOPMENT=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --arch) ARCH="$2"; shift 2 ;;
     --skip-build) SKIP_BUILD=1; shift ;;
+    --development) DEVELOPMENT=1; SKIP_BUILD=1; ARCH=aarch64; shift ;;
     -h | --help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -39,8 +41,8 @@ export MACOSX_DEPLOYMENT_TARGET=11.0
 IDENTITY="${MACOS_SIGN_IDENTITY:--}"
 SHORT_VERSION="${VERSION%%-*}"
 WORK="$CARGO_TARGET_DIR/macos-package"
-APP="$WORK/DeckCraft.app"
-DMG="$DIST/deckcraft-$VERSION-macos-$ARCH.dmg"
+APP="$WORK/DeckCraft AI.app"
+DMG="$DIST/deckcraft-ai-$VERSION-macos-$ARCH.dmg"
 CLI_ZIP="$DIST/deckcraft-cli-$VERSION-macos-$ARCH.zip"
 
 NOTARIZE=0
@@ -56,6 +58,10 @@ echo "==> DeckCraft $VERSION for macOS ($ARCH), identity: $IDENTITY, notarize: $
 
 # ---- build -------------------------------------------------------------------------------------
 if [ "$SKIP_BUILD" = 0 ]; then
+  export CRAFT_FONTS_DIR="${CRAFT_FONTS_DIR:-$ROOT/../craft-fonts}"
+  if [ ! -f "$CRAFT_FONTS_DIR/fonts/libertinus/LibertinusMath-Regular.otf" ]; then
+    sh "$ROOT/scripts/fetch-math-font.sh"
+  fi
   args=()
   for t in "${TARGETS[@]}"; do args+=(--target "$t"); done
   (cd "$ROOT" && cargo build --release --locked -p deckcraft -p deckcraft-cli "${args[@]}")
@@ -65,7 +71,9 @@ rm -rf "$WORK"
 mkdir -p "$WORK/bin"
 for bin in deckcraft deckcraft-cli; do
   inputs=()
-  for t in "${TARGETS[@]}"; do inputs+=("$CARGO_TARGET_DIR/$t/release/$bin"); done
+  if [ "$DEVELOPMENT" = 1 ]; then inputs+=("$CARGO_TARGET_DIR/debug/$bin"); else
+    for t in "${TARGETS[@]}"; do inputs+=("$CARGO_TARGET_DIR/$t/release/$bin"); done
+  fi
   lipo -create -output "$WORK/bin/$bin" "${inputs[@]}"
   lipo -info "$WORK/bin/$bin"
 done
@@ -104,7 +112,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$WORK/bin/deckcraft" "$APP/Contents/MacOS/DeckCraft"
 cp "$ROOT/assets/app-icon/deckcraft.icns" "$APP/Contents/Resources/DeckCraft.icns"
 # Licences of the embedded craft-fonts fonts (only when built with CRAFT_FONTS_DIR).
-copy_font_licences "$APP/Contents/Resources"
+copy_docs "$APP/Contents/Resources"
 sed -e "s/@VERSION@/$VERSION/g" -e "s/@SHORT_VERSION@/$SHORT_VERSION/g" \
   -e "s/@BUILD_SHA@/${DECKCRAFT_BUILD_SHA:-unknown}/g" \
   "$HERE/Info.plist.in" >"$APP/Contents/Info.plist"
@@ -129,17 +137,16 @@ fi
 echo "==> building $DMG"
 STAGE="$WORK/dmg"
 mkdir -p "$STAGE"
-ditto "$APP" "$STAGE/DeckCraft.app"
+ditto "$APP" "$STAGE/DeckCraft AI.app"
 ln -s /Applications "$STAGE/Applications"
 # Finder window layout: background, icon size and positions (packaging/macos/dmg/README.md).
 mkdir -p "$STAGE/.background"
-cp "$HERE/dmg/background.tiff" "$STAGE/.background/background.tiff"
-cp "$HERE/dmg/dmg-layout.DS_Store" "$STAGE/.DS_Store"
+# Fork packages use the standard Finder layout. The upstream .DS_Store names the upstream app.
 rm -f "$DMG" "$WORK/raw.dmg"
 # makehybrid + convert builds the image without attaching a device, unlike `create -srcfolder`,
 # which is flaky on CI runners ("Resource busy") and hangs in sandboxed sessions.
 # The volume name has no version: .DS_Store finds the background through an alias that includes it.
-hdiutil makehybrid -hfs -hfs-volume-name "DeckCraft" -hfs-openfolder "$STAGE" -o "$WORK/raw.dmg" "$STAGE"
+hdiutil makehybrid -hfs -hfs-volume-name "DeckCraft AI" -hfs-openfolder "$STAGE" -o "$WORK/raw.dmg" "$STAGE"
 hdiutil convert "$WORK/raw.dmg" -format UDZO -imagekey zlib-level=9 -o "$DMG"
 rm -f "$WORK/raw.dmg"
 sign "$DMG"

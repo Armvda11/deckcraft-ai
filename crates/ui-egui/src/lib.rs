@@ -6,6 +6,8 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod ai;
 pub mod backstage;
 pub mod canvas;
 pub mod control;
@@ -133,6 +135,12 @@ impl Default for UiState {
 
 /// UI-only commands (id, label, shortcut, params).
 pub const UI_COMMANDS: &[(&str, &str, Option<&str>, &str)] = &[
+    ("ai.open", "AI Studio", None, "{}"),
+    ("ai.generate", "Generate Presentation", None, "{brief?, slides?, audience?, reviewOutline?}"),
+    ("ai.edit", "Refine with AI", None, "{prompt?, scope?: objects|slide|deck}"),
+    ("ai.cancel", "Cancel AI Job", None, "{}"),
+    ("ai.accept", "Accept AI Candidate", None, "{separate?: bool}"),
+    ("ai.status", "AI Job Status", None, "{}"),
     ("view.normal", "Normal", None, "{}"),
     ("view.outline", "Outline View", None, "{}"),
     ("view.sorter", "Slide Sorter", None, "{}"),
@@ -178,6 +186,8 @@ pub struct Perf {
 }
 
 pub struct SlideApp {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ai: ai::State,
     pub session: Session,
     pub services: Services,
     pub ui: UiState,
@@ -233,6 +243,8 @@ impl SlideApp {
     pub fn new(session: Session, mut services: Services) -> Self {
         let audio_out = services.audio_out.take();
         SlideApp {
+            #[cfg(not(target_arch = "wasm32"))]
+            ai: ai::State::default(),
             session,
             services,
             ui: UiState::default(),
@@ -448,6 +460,12 @@ impl SlideApp {
     }
 
     fn run_ui(&mut self, id: &str, p: &Value) -> Result<Value, String> {
+        if id.starts_with("ai.") {
+            #[cfg(not(target_arch = "wasm32"))]
+            return ai::command(self, id, p);
+            #[cfg(target_arch = "wasm32")]
+            return Err("AI Studio is available in the desktop application".into());
+        }
         match id {
             "view.normal" => self.ui.view = ViewMode::Normal,
             "view.outline" => self.ui.view = ViewMode::Outline,
@@ -687,6 +705,15 @@ impl SlideApp {
     /// A dropped or picked file: presentations open, media is inserted.
     pub fn open_or_insert_bytes(&mut self, name: &str, bytes: &[u8]) {
         let lower = name.to_ascii_lowercase();
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.ui.pane.as_deref() == Some("ai")
+            && [".pdf", ".docx", ".txt", ".md", ".csv", ".png", ".jpg", ".jpeg", ".webp", ".gif"].iter().any(|ext| lower.ends_with(ext))
+        {
+            if let Err(error) = self.ai.attach_bytes(name, bytes) {
+                self.set_status(error);
+            }
+            return;
+        }
         let data = deckcraft_engine::cmd::base64_encode(bytes);
         let ct = deckcraft_engine::cmd::insert::content_type(name, bytes);
         let cmd = if lower.ends_with(".deckcraft")
@@ -719,6 +746,8 @@ impl SlideApp {
 
     /// Per-frame logic before layout: styles, control requests, screenshots, shortcuts.
     pub fn logic(&mut self, ctx: &egui::Context) {
+        #[cfg(not(target_arch = "wasm32"))]
+        self.ai.poll(ctx);
         let scale = self.ui.ui_scale.clamp(0.5, 3.0);
         if (ctx.zoom_factor() - scale).abs() > 1e-3 {
             ctx.set_zoom_factor(scale);

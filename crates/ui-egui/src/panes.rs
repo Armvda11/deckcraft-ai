@@ -27,6 +27,7 @@ pub fn show(app: &mut SlideApp, ui: &mut Ui) {
                 "selection" => "Selection",
                 "comments" => "Comments",
                 "designer" => "Design Ideas",
+                "ai" => "AI Studio",
                 _ => "Pane",
             };
             ui.horizontal(|ui| {
@@ -50,6 +51,8 @@ pub fn show(app: &mut SlideApp, ui: &mut Ui) {
                 "selection" => crate::selpane::show(app, ui),
                 "comments" => comments(app, ui),
                 "designer" => designer(app, ui),
+                #[cfg(not(target_arch = "wasm32"))]
+                "ai" => crate::ai::show(app, ui),
                 _ => {}
             });
         });

@@ -3,9 +3,9 @@ Copyright (c) 2026 ArtCraft Team and the DeckCraft contributors.
 Licensed under the MIT License or the Apache License, Version 2.0, at your option
 (LICENSE-MIT, LICENSE-APACHE).
 
-The ArtCraft name, wordmark and logos in docs/brand/ are trademarks of the ArtCraft Team. They are
-not open source and are not covered by the license above; their terms are in
-docs/brand/LICENSE-brand.txt.
+The ArtCraft name, wordmark and logos in the upstream repository are trademarks of the ArtCraft
+Team and are not covered by the code license. This fork removes those logo files; upstream terms
+are retained in docs/brand/LICENSE-brand.txt for reference.
 
 Third-party material
 
@@ -27,3 +27,11 @@ Code dependencies
   https://github.com/pdeljanov/Symphonia.
 - The H.264, HEVC, VP9, AV1, Opus, MP4, Matroska and Ogg crates under crates/ are ported from
   FilmCraft (same owner, MIT OR Apache-2.0).
+
+DeckCraft AI extension
+This downstream project is based on DeckCraft revision 457406a7a5b62425e915926c8ccb0984e61a198c.
+Upstream copyright and licenses are retained. The fork does not distribute ArtCraft logos.
+- Libertinus Math v7.051: Copyright 2012-2024 The Libertinus Project Authors, OFL-1.1.
+  See the accompanying OFL-libertinus.txt in packaged builds.
+- Typst compiler assets: see licenses/typst-assets-NOTICE.txt for component notices.
+  The optional typst-assets document font bundle is disabled.

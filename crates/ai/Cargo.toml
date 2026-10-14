@@ -1,0 +1,44 @@
+[package]
+name = "deckcraft-ai"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Structured AI presentation creation and scoped editing"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+deckcraft-model = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+deckcraft-engine = { workspace = true }
+deckcraft-format = { workspace = true }
+deckcraft-render = { workspace = true }
+deckcraft-fonts = { workspace = true }
+deckcraft-text = { workspace = true }
+deckcraft-geom = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+tokio = { version = "1", features = ["rt", "time", "process", "sync", "io-util", "net", "macros"] }
+tempfile = "3"
+pdf-extract = "0.12"
+hayro = { version = "0.7", default-features = false }
+quick-xml = { workspace = true }
+zip = { workspace = true }
+image = { workspace = true }
+mitex = "0.2"
+typst = "0.15"
+typst-render = "0.15"
+typst-layout = "0.15"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+deckcraft-pdf = { workspace = true }

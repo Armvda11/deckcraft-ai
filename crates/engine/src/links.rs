@@ -1,8 +1,8 @@
-//! Community and project links (shown in Help, About, the CLI and MCP).
+//! Project links. The fork has no public community or release page configured yet.
 
-pub const DISCORD: &str = "https://discord.gg/artcraft";
-pub const WEBSITE: &str = "https://getartcraft.com/";
-pub const APPS: &str = "https://getartcraft.com/apps";
-pub const APP_PAGE: &str = "https://getartcraft.com/apps/deckcraft";
+pub const DISCORD: &str = "";
+pub const WEBSITE: &str = "";
+pub const APPS: &str = "";
+pub const APP_PAGE: &str = GITHUB;
 pub const GITHUB: &str = "https://github.com/storytold/deckcraft";
 pub const ISSUES: &str = "https://github.com/storytold/deckcraft/issues";

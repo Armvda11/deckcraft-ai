@@ -870,7 +870,7 @@ fn shape_cells(
             .filter(|_| cluster.first().is_some_and(|c| ('\u{F000}'..='\u{F0FF}').contains(c)))
             .filter(|f| db.has_family(f))
             .map(|f| db.face(f, st.style_name))
-            .filter(|f| deckcraft_fonts::covers_cluster(f, cluster));
+            .filter(|f| cluster.iter().all(|c| symbol_font_char(f, &c.to_string(), st.sym.as_deref()).is_some()));
         let face = match (sym_face, prev.as_ref()) {
             (Some(f), _) => f,
             (None, Some(p))
@@ -1054,7 +1054,11 @@ fn shape_item(
     let (Some(&b0), Some(&b1)) = (byte_of.get(range.start), byte_of.get(range.end)) else { return };
     let features = shaping_features(cells.get(range.clone()).unwrap_or(&[]), styles, script);
     let params = ShapeParams { features: &features, rtl, script, language: lang };
-    let glyphs = deckcraft_fonts::shape_range(face, text, b0..b1, &params, |ch| if upper { caps_char(ch) } else { ch });
+    let sym = styles.get(first.style).and_then(|s| s.sym.as_deref());
+    let glyphs = deckcraft_fonts::shape_range(face, text, b0..b1, &params, |ch| {
+        let ch = if (0xF000..=0xF0FF).contains(&(ch as u32)) { symbol_font_char(face, &ch.to_string(), sym).unwrap_or(ch) } else { ch };
+        if upper { caps_char(ch) } else { ch }
+    });
     let upem = face.upem.max(1.0);
     let scale_of = |cell: &Cell| {
         let st = styles.get(cell.style);
@@ -1149,6 +1153,21 @@ fn symbol_font_char(face: &FontFace, c: &str, font: Option<&str>) -> Option<char
         Some(pua)
     } else if face.covers(first) {
         Some(first)
+    } else if font.eq_ignore_ascii_case("Symbol") {
+        // macOS Symbol maps Unicode rather than the Windows private-use character codes.
+        let unicode = match (first as u32) & 0xff {
+            0xac => '←',
+            0xad => '↑',
+            0xae => '→',
+            0xaf => '↓',
+            0xdb => '⇔',
+            0xdc => '⇐',
+            0xdd => '⇑',
+            0xde => '⇒',
+            0xdf => '⇓',
+            _ => return None,
+        };
+        face.covers(unicode).then_some(unicode)
     } else {
         None
     }

@@ -172,6 +172,7 @@ pub struct Backstage {
     pub file_type: &'static str,
     pub handouts_per_page: u8,
     pub pdf_hidden: bool,
+    pub click_states: bool,
 }
 
 impl Backstage {
@@ -192,6 +193,7 @@ impl Backstage {
             file_type: "pptx",
             handouts_per_page: 3,
             pdf_hidden: false,
+            click_states: false,
         }
     }
 
@@ -634,9 +636,13 @@ fn home(app: &mut SlideApp, ui: &mut Ui, bs: &mut Backstage, out: &mut Outcome) 
     ui.horizontal(|ui| {
         let (r, _) = ui.allocate_exact_size(vec2(36.0, 36.0), Sense::hover());
         crate::dialogs::paint_logo(ui.painter(), r);
-        ui.label(RichText::new("DeckCraft").font(theme::bold(24.0)).color(t.text));
+        ui.label(RichText::new("DeckCraft AI").font(theme::bold(24.0)).color(t.text));
     });
     ui.add_space(18.0);
+    #[cfg(not(target_arch = "wasm32"))]
+    if ui.button("Create with AI…").clicked() {
+        let _ = app.run("ai.open", json!({}));
+    }
     ui.horizontal(|ui| {
         ui.label(RichText::new("New").font(theme::bold(16.0)).color(t.text));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -665,7 +671,7 @@ fn home(app: &mut SlideApp, ui: &mut Ui, bs: &mut Backstage, out: &mut Outcome) 
         });
     }
     ui.add_space(30.0);
-    ui.hyperlink_to("Join the ArtCraft community on Discord", deckcraft_engine::links::DISCORD);
+    ui.hyperlink_to("Upstream DeckCraft project on GitHub", deckcraft_engine::links::GITHUB);
 }
 
 /// New: a blank presentation, then every theme with a search box.
@@ -890,7 +896,7 @@ pub fn print_params(bs: &Backstage, slides: &[usize]) -> Value {
         _ => ("slides", 0),
     };
     // The list is already filtered for hidden slides, so the PDF takes it as it is.
-    json!({"layout": layout, "perPage": per, "slides": slides, "includeHidden": true, "frame": bs.print_frame})
+    json!({"layout": layout, "perPage": per, "slides": slides, "includeHidden": true, "frame": bs.print_frame,"clickStates":bs.click_states})
 }
 
 const LAYOUTS: [(&str, &str); 8] = [
@@ -972,6 +978,7 @@ fn print(app: &mut SlideApp, ui: &mut Ui, bs: &mut Backstage) {
                 bs.preview_page = 0;
             }
             ui.checkbox(&mut bs.print_frame, "Frame Slides");
+            ui.checkbox(&mut bs.click_states, "Include successive click states (preview shows static slides)");
             ui.add_space(6.0);
             if ui.link("Edit Header & Footer").clicked() {
                 let _ = app.run("app.dialog", json!({"id": "headerFooter"}));
@@ -1130,13 +1137,15 @@ fn export(app: &mut SlideApp, ui: &mut Ui, bs: &mut Backstage) {
                         &["Keeps the layout, fonts and pictures", "Opens on any device with a PDF viewer", "The presentation keeps its own file"],
                     );
                     ui.checkbox(&mut bs.pdf_hidden, "Include hidden slides");
+                    ui.checkbox(&mut bs.click_states, "Include successive click states");
                     ui.add_space(10.0);
                     if square_button(ui, Icon::File, "Create PDF", true).clicked() {
-                        app.export_as("pdf", json!({"includeHidden": bs.pdf_hidden}));
+                        app.export_as("pdf", json!({"includeHidden": bs.pdf_hidden,"clickStates":bs.click_states}));
                     }
                 }
                 ExportTask::Handouts => {
                     ui.label(RichText::new("Create Handouts").font(theme::font(16.0)).color(t.text));
+                    ui.checkbox(&mut bs.click_states, "Include successive click states");
                     bullets(ui, &["Several slides on each page of a PDF", "Three a page leaves lines for notes", "Print them for your audience"]);
                     egui::ComboBox::from_id_salt("backstage_handouts")
                         .width(240.0)
@@ -1150,7 +1159,7 @@ fn export(app: &mut SlideApp, ui: &mut Ui, bs: &mut Backstage) {
                         });
                     ui.add_space(10.0);
                     if square_button(ui, Icon::Notes, "Create Handouts", true).clicked() {
-                        app.export_as("pdf", json!({"layout": "handouts", "perPage": bs.handouts_per_page}));
+                        app.export_as("pdf", json!({"layout": "handouts", "perPage": bs.handouts_per_page,"clickStates":bs.click_states}));
                     }
                 }
                 ExportTask::FileType => {
@@ -1219,7 +1228,7 @@ fn account(app: &mut SlideApp, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 let (r, _) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::hover());
                 crate::dialogs::paint_logo(ui.painter(), r);
-                ui.label(RichText::new("DeckCraft").font(theme::bold(24.0)).color(t.text));
+                ui.label(RichText::new("DeckCraft AI").font(theme::bold(24.0)).color(t.text));
             });
             dim(ui, &crate::dialogs::version_line());
             dim(ui, "Open source under MIT OR Apache-2.0. Not affiliated with Microsoft.");
@@ -1234,8 +1243,7 @@ fn account(app: &mut SlideApp, ui: &mut Ui) {
             ) {
                 let _ = app.run("app.about", json!({}));
             }
-            ui.hyperlink_to("Join our community on Discord", deckcraft_engine::links::DISCORD);
-            ui.hyperlink_to("Source on GitHub", deckcraft_engine::links::GITHUB);
+            ui.hyperlink_to("Upstream DeckCraft project on GitHub", deckcraft_engine::links::GITHUB);
         });
     });
 }
